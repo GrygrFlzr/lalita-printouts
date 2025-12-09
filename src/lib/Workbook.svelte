@@ -56,7 +56,10 @@
     if (timestampKey) {
       maybeSortable.sort((a, b) => {
         const aDate: Date = a[timestampKey];
-        const bDate: Date = b[timestampKey];
+        const bDate: Date | undefined = b[timestampKey];
+        if (typeof bDate === 'undefined') {
+          return -1;
+        }
         return bDate.getTime() - aDate.getTime();
       });
     }
@@ -68,8 +71,6 @@
     return [...Array(pageCount)].map((_, index) => {
       const start = index * chunkSize;
       const end = start + chunkSize;
-      console.log(start, end);
-      console.log(list.slice(start, end));
       return list.slice(start, end);
     });
   };

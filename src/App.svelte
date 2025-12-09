@@ -49,7 +49,6 @@
     .join(',');
 
   let files: FileList | undefined | null = $state(null);
-  $inspect(files);
 </script>
 
 <main class="container mx-auto min-h-screen bg-white px-4 py-8 not-print:shadow-md">
