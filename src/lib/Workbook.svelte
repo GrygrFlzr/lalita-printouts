@@ -46,6 +46,7 @@
   };
 
   const trySortByDate = (maybeSortable: Record<string, any>[]) => {
+    // TODO: Handle case where some rows have timestamp and others don't
     if (maybeSortable.length === 0) {
       return maybeSortable;
     }
@@ -58,6 +59,7 @@
         const aDate: Date = a[timestampKey];
         const bDate: Date | undefined = b[timestampKey];
         if (typeof bDate === 'undefined') {
+          // push undated rows to back of list
           return -1;
         }
         return bDate.getTime() - aDate.getTime();
