@@ -207,7 +207,13 @@
                   <span class="ml-2 font-bold">{value}</span>
                 {:else if typeof value === 'string' && value.includes('\n')}
                   <span class="text-sm print:text-xs">{key}</span>
-                  <p class="ml-2">{value}</p>
+                  <div class="ml-2">
+                    {#each value.split('\n') as line}
+                      {#if line.trim().length > 0}
+                        <p>{line}</p>
+                      {/if}
+                    {/each}
+                  </div>
                 {:else if typeof value === 'number' && key.includes('(')}
                   {@const parenIndex = key.indexOf('(')}
                   {@const unitlessKey = key.slice(0, parenIndex).trim()}
