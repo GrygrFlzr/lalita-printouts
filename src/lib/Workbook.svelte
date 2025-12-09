@@ -211,6 +211,8 @@
                     {#each value.split('\n') as line}
                       {#if line.trim().length > 0}
                         <p>{line}</p>
+                      {:else}
+                        <br />
                       {/if}
                     {/each}
                   </div>
