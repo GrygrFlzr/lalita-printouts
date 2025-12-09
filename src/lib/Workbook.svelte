@@ -121,6 +121,7 @@
       bind:value={selectedSheetName}
       onchange={() => {
         searchQuery = '';
+        currentPage = 0;
       }}
     >
       {#each workbook.SheetNames as sheetName, index (sheetName)}
