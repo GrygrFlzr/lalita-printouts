@@ -214,9 +214,15 @@
                   <p class="ml-2">{value} {unit}</p>
                 {:else}
                   <span class="text-sm print:text-xs">{key}</span>
-                  <span class="ml-2"
-                    >{value instanceof Date ? dateFormatter.format(value) : `${value}`}</span
-                  >
+                  <span class="ml-2">
+                    {#if value instanceof Date}
+                      {dateFormatter.format(value)}
+                    {:else if typeof value === 'boolean'}
+                      {value ? 'Ya' : 'Tidak'}
+                    {:else}
+                      {value}
+                    {/if}
+                  </span>
                 {/if}
               </div>
             {/each}
