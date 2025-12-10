@@ -8,75 +8,117 @@
   const { workbook, failed }: Props = $props();
   const { SheetNames } = $derived(workbook);
 
-  const excelEpochMs = Date.UTC(1900, 0, 1);
+  const excelEpochMs = Date.UTC(1900, 0, 1) - 2 * 24 * 60 * 60 * 1000;
   const dateFormatter = new Intl.DateTimeFormat('id-ID', {
     dateStyle: 'long',
     timeZone: 'Asia/Jakarta'
   });
   const parseExcelDate = (daysSinceEpoch: number) =>
     new Date(excelEpochMs + daysSinceEpoch * 24 * 60 * 60 * 1000);
-  const formatObject = (maybeObject: any): Record<string, any> => {
+  const maybeNIK = /\bNIK|KTP|KIA\b/;
+  const ignorableDateInMs = Date.UTC(2100, 0, 1);
+  const formatObjectAsEntries = (maybeObject: any): [string, string | Date | number | bigint][] => {
     if (typeof maybeObject === 'object') {
-      let importantField = null;
-      for (const [key, value] of Object.entries(maybeObject)) {
-        const lowerCaseKey = key.toLowerCase();
-        if (
-          importantField === null &&
-          (lowerCaseKey.includes('nama anak') || lowerCaseKey.includes('nama pasien'))
-        ) {
-          // only use first appearance
-          importantField = key;
-        }
-        if (typeof value === 'number') {
-          if (lowerCaseKey.includes('timestamp') || lowerCaseKey.includes('tanggal')) {
-            maybeObject[key] = parseExcelDate(value);
+      return Object.entries(maybeObject)
+        .sort((a, b) => {
+          const aKey = a[0].toLowerCase();
+          const bKey = b[0].toLowerCase();
+          if (aKey.includes('nama anak') || aKey.includes('nama pasien')) {
+            return -1;
+          } else if (bKey.includes('nama anak') || bKey.includes('nama pasien')) {
+            return 1;
           }
-        } else if (typeof value === 'boolean') {
-          maybeObject[key] = value ? 'Ya' : 'Tidak';
-        }
-      }
-      if (importantField) {
-        return {
-          [importantField]: maybeObject[importantField],
-          ...maybeObject
-        };
-      }
-      return maybeObject;
+          return 0;
+        })
+        .map(([key, value]) => {
+          switch (typeof value) {
+            case 'number': {
+              const lowercaseKey = key.toLowerCase();
+              if (lowercaseKey.includes('timestamp') || lowercaseKey.includes('tanggal')) {
+                const date = parseExcelDate(value);
+                if (date.getTime() < ignorableDateInMs) {
+                  return [key, date];
+                }
+                // fishy date, so don't convert it
+              }
+              // explicit fallthrough for other numbers
+            }
+            case 'bigint': {
+              // NIK cannot begin with 0, so we can guarantee length
+              // sometimes people typo and miss a number, so also accept 15
+              if (maybeNIK.test(key)) {
+                const valueAsString = value.toString();
+                const valueLength = valueAsString.length;
+                if (valueLength === 15 || valueLength === 16) {
+                  return [key, valueAsString];
+                }
+              }
+              // fallback to just returning the bigint/number
+              return [key, value];
+            }
+            case 'boolean':
+              // autocast to indonesian
+              return [key, value ? 'Ya' : 'Tidak'];
+            case 'string': {
+              const lowercaseKey = key.toLowerCase();
+              if (lowercaseKey.includes('timestamp') || lowercaseKey.includes('tanggal')) {
+                const maybeDate = new Date(value);
+                const isValidDate = !isNaN(maybeDate.getTime());
+                if (isValidDate) {
+                  return [key, maybeDate];
+                }
+              }
+              return [key, value];
+            }
+            // really strange cases that should never happen, ideally
+            case 'object':
+              return [key, JSON.stringify(value, null, 2)];
+            case 'function':
+            case 'symbol':
+              return [key, value.toString()];
+            case 'undefined':
+              return [key, 'undefined'];
+            default:
+              return [key, `${value}`];
+          }
+        });
     }
-    return {};
+    return [];
   };
 
-  const trySortByDate = (maybeSortable: Record<string, any>[]) => {
-    // TODO: Handle case where some rows have timestamp and others don't
+  const isDateEntry = (item: [string, any]): item is [string, Date] => item[1] instanceof Date;
+  const findTimestamp = (item: [string, Date]) => item[0].toLowerCase().includes('timestamp');
+  const trySortByDate = (maybeSortable: [string, string | Date | number | bigint][][]) => {
     if (maybeSortable.length === 0) {
+      // base case: no need to sort empty array
       return maybeSortable;
     }
-    const firstSample = maybeSortable[0];
-    const timestampKey = Object.keys(firstSample).find((name) =>
-      name.toLowerCase().includes('timestamp')
-    );
-    if (timestampKey) {
-      maybeSortable.sort((a, b) => {
-        const aDate: Date | undefined = a[timestampKey];
-        const bDate: Date | undefined = b[timestampKey];
-        const aDefined = typeof aDate !== 'undefined';
-        const bDefined = typeof bDate !== 'undefined';
-        if (typeof aDate !== 'undefined' && typeof bDate !== 'undefined') {
+    // otherwise, try sort (don't mutate original)
+    return [...maybeSortable].sort((a, b) => {
+      const aDates = a.filter(isDateEntry);
+      const bDates = b.filter(isDateEntry);
+      if (aDates.length > 0 && bDates.length > 0) {
+        const aEntry = aDates.find(findTimestamp);
+        const bEntry = bDates.find(findTimestamp);
+        if (typeof aEntry !== 'undefined' && typeof bEntry !== 'undefined') {
+          // both have timestamps
+          const aDate = aEntry[1];
+          const bDate = bEntry[1];
           return bDate.getTime() - aDate.getTime();
-        }
-        // otherwise, push back un-timestamped entry
-        if (!bDefined && aDefined) {
+        } else if (typeof aEntry !== 'undefined' && typeof bEntry === 'undefined') {
+          // only a has timestamp, move it to earlier in order
           return -1;
-        } else if (!aDefined && bDefined) {
+        } else if (typeof aEntry === 'undefined' && typeof bEntry !== 'undefined') {
+          // only b has timestamp, move it to earlier in order
           return 1;
         }
-        return 0;
-      });
-    }
-    return maybeSortable;
+      }
+      // otherwise, sort descending by number of keys
+      return b.length - a.length;
+    });
   };
 
-  const chunk = (list: Record<string, any>[], chunkSize: number) => {
+  const chunk = <T,>(list: T[], chunkSize: number) => {
     const pageCount = Math.ceil(list.length / chunkSize);
     return [...Array(pageCount)].map((_, index) => {
       const start = index * chunkSize;
@@ -154,16 +196,15 @@
             }}
           />
         </label>
-        {@const originalList = selectedSheet.map(formatObject)}
+        {@const originalList = selectedSheet.map(formatObjectAsEntries)}
         {@const filteredList =
           searchQuery === ''
             ? originalList
             : originalList.filter((item) =>
-                Object.values(item).some(
-                  // at least one value contains the substring
-                  (item) =>
-                    typeof item === 'string' &&
-                    item.toLowerCase().includes(searchQuery.toLowerCase())
+                item.some(
+                  ([_key, value]) =>
+                    typeof value === 'string' &&
+                    value.toLowerCase().includes(searchQuery.toLowerCase())
                 )
               )}
         {@const sortedList = trySortByDate(filteredList)}
@@ -205,12 +246,12 @@
                   >Print</button
                 >
               </div>
-              {#each Object.entries(entry) as [key, value] (key)}
+              {#each entry as [key, value] (key)}
                 {@const lowerCaseKey = key.toLowerCase()}
                 <div
                   class="flex break-inside-avoid flex-col divide-y divide-green-500 print:divide-black"
                 >
-                  {#if lowerCaseKey.includes('timestamp')}
+                  {#if lowerCaseKey.includes('timestamp') && value instanceof Date}
                     <span class="text-sm print:text-xs">Tanggal masuk data</span>
                     <span class="ml-2">{dateFormatter.format(value)}</span>
                   {:else if lowerCaseKey.includes('nama anak') || lowerCaseKey.includes('nama pasien')}
@@ -227,7 +268,7 @@
                         {/if}
                       {/each}
                     </div>
-                  {:else if typeof value === 'number' && key.includes('(')}
+                  {:else if (typeof value === 'number' || typeof value === 'bigint') && key.includes('(')}
                     {@const parenIndex = key.indexOf('(')}
                     {@const unitlessKey = key.slice(0, parenIndex).trim()}
                     {@const unit = key.slice(parenIndex + 1).replace(/\)$/, '')}
