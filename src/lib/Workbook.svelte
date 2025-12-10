@@ -56,13 +56,20 @@
     );
     if (timestampKey) {
       maybeSortable.sort((a, b) => {
-        const aDate: Date = a[timestampKey];
+        const aDate: Date | undefined = a[timestampKey];
         const bDate: Date | undefined = b[timestampKey];
-        if (typeof bDate === 'undefined') {
-          // push undated rows to back of list
-          return -1;
+        const aDefined = typeof aDate !== 'undefined';
+        const bDefined = typeof bDate !== 'undefined';
+        if (typeof aDate !== 'undefined' && typeof bDate !== 'undefined') {
+          return bDate.getTime() - aDate.getTime();
         }
-        return bDate.getTime() - aDate.getTime();
+        // otherwise, push back un-timestamped entry
+        if (!bDefined && aDefined) {
+          return -1;
+        } else if (!aDefined && bDefined) {
+          return 1;
+        }
+        return 0;
       });
     }
     return maybeSortable;
