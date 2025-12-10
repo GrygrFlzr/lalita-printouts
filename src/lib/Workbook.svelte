@@ -138,119 +138,167 @@
   </label>
 </div>
 
-{#if selectedSheetName}
-  {#key selectedSheetName}
-    {#if selectedSheet && selectedSheet.length > 0}
-      <label class="flex max-w-80 flex-col print:hidden">
-        <span class="font-bold">Cari data:</span>
-        <input
-          type="text"
-          bind:value={searchQuery}
-          class="rounded-sm border border-green-500 bg-green-100 px-4 py-2 text-green-950"
-          onchange={() => {
-            currentPage = 0;
-          }}
-        />
-      </label>
-      {@const originalList = selectedSheet.map(formatObject)}
-      {@const filteredList =
-        searchQuery === ''
-          ? originalList
-          : originalList.filter((item) =>
-              Object.values(item).some(
-                // at least one value contains the substring
-                (item) =>
-                  typeof item === 'string' && item.toLowerCase().includes(searchQuery.toLowerCase())
-              )
-            )}
-      {@const sortedList = trySortByDate(filteredList)}
-      {@const chunkedList = chunk(sortedList, pageSize)}
-      {@const pageEntries = chunkedList[currentPage]}
-      <fieldset class="print:hidden">
-        <legend>
-          Halaman <strong>{currentPage + 1}</strong> dari <strong>{chunkedList.length}</strong>
-        </legend>
-        {#if chunkedList.length > 1}
-          <button
-            disabled={currentPage === 0}
-            onclick={() => {
-              currentPage--;
-            }}
-            class="rounded-md border-b border-b-green-900 bg-green-700 px-3 py-1.5 text-xs text-green-50 not-disabled:cursor-pointer not-disabled:hover:bg-green-600 disabled:border-b-gray-600 disabled:bg-gray-300 disabled:text-gray-500"
-            >&lt; Halaman Sebelumnya</button
-          >
-          <button
-            disabled={currentPage === chunkedList.length - 1}
-            onclick={() => {
-              currentPage++;
-            }}
-            class="rounded-md border-b border-b-green-900 bg-green-700 px-3 py-1.5 text-xs text-green-50 not-disabled:cursor-pointer not-disabled:hover:bg-green-600 disabled:border-b-gray-600 disabled:bg-gray-300 disabled:text-gray-500"
-            >Halaman Selanjutnya &gt;</button
-          >
+<svelte:boundary>
+  {#snippet failed(error, reset)}
+    <h3 class="text-xl text-red-500">Ada masalah dengan proses file</h3>
+    <p>Harap kontak IT dengan screenshot eror bawah dan sertakan file yang bermasalah.</p>
+    <button
+      class="text-md cursor-pointer rounded-md border-b-2 border-b-green-900 bg-green-700 px-3 py-1.5 text-green-50 hover:bg-green-600"
+      onclick={reset}>Atau klik tombol ini untuk coba lagi</button
+    >
+    <p>Penjelasan untuk tim IT:</p>
+    <div class="flex flex-col border-l border-red-500 py-2 pl-4">
+      <fieldset class="border border-black px-2 pb-2 text-sm">
+        <legend class="text-slate-700">metadata</legend>
+        <p><strong>properties</strong>: {Object.getOwnPropertyNames(error).join(', ')}</p>
+        <p><strong>getPrototypeOf</strong>: {Object.getPrototypeOf(error)}</p>
+      </fieldset>
+      <fieldset class="text-md border border-green-900 px-2 pb-2">
+        <legend class="text-slate-700">actual error object</legend>
+        {#if error instanceof Error}
+          {#if 'name' in error}
+            <p><strong>name</strong>: {error.name}</p>
+          {/if}
+          {#if 'message' in error}
+            <p><strong>message</strong>: {error.message}</p>
+          {/if}
+          {#if 'cause' in error}
+            <p><strong>message</strong>: {error.cause}</p>
+          {/if}
+          <p><strong>stack</strong></p>
+          {#if 'stack' in error}
+            {#if typeof error.stack === 'string' && error.stack.includes('\n')}
+              <ol class="list-decimal pl-8">
+                {#each error.stack.split('\n').filter((line) => line.trim().length > 0) as line}
+                  <li class="font-mono">{line}</li>
+                {/each}
+              </ol>
+            {:else}
+              <pre class="pl-2 text-xs"><code>{error.stack}</code></pre>
+            {/if}
+          {/if}
+        {:else}
+          <pre><code>type: {typeof error}</code></pre>
+          <pre><code>{error}</code></pre>
         {/if}
       </fieldset>
-      <div class="mt-6 grid grid-cols-1 gap-6 not-print:sm:grid-cols-2">
-        {#each pageEntries as entry, index}
-          <div
-            class:hidden={isPrinting ? index !== printIndex : false}
-            class="relative grid grid-cols-1 gap-y-2 rounded-sm p-4 not-print:bg-green-50 not-print:shadow-sm print:grid-cols-2 print:gap-x-6 print:gap-y-1"
-          >
-            <div class="absolute top-0 right-0 p-2 print:hidden">
-              <button
-                onclick={() => triggerPrint(index)}
-                class="text-md cursor-pointer rounded-md border-b-2 border-b-green-900 bg-green-700 px-3 py-1.5 text-green-50 hover:bg-green-600"
-                >Print</button
-              >
-            </div>
-            {#each Object.entries(entry) as [key, value] (key)}
-              {@const lowerCaseKey = key.toLowerCase()}
-              <div
-                class="flex break-inside-avoid flex-col divide-y divide-green-500 print:divide-black"
-              >
-                {#if lowerCaseKey.includes('timestamp')}
-                  <span class="text-sm print:text-xs">Tanggal masuk data</span>
-                  <span class="ml-2">{dateFormatter.format(value)}</span>
-                {:else if lowerCaseKey.includes('nama anak') || lowerCaseKey.includes('nama pasien')}
-                  <span class="text-sm font-semibold print:text-xs">{key}</span>
-                  <span class="ml-2 font-bold">{value}</span>
-                {:else if typeof value === 'string' && value.includes('\n')}
-                  <span class="text-sm print:text-xs">{key}</span>
-                  <div class="ml-2">
-                    {#each value.split('\n') as line}
-                      {#if line.trim().length > 0}
-                        <p>{line}</p>
-                      {:else}
-                        <br />
-                      {/if}
-                    {/each}
-                  </div>
-                {:else if typeof value === 'number' && key.includes('(')}
-                  {@const parenIndex = key.indexOf('(')}
-                  {@const unitlessKey = key.slice(0, parenIndex).trim()}
-                  {@const unit = key.slice(parenIndex + 1).replace(/\)$/, '')}
-                  <span class="text-sm print:text-xs">{unitlessKey}</span>
-                  <p class="ml-2">{value} {unit}</p>
-                {:else}
-                  <span class="text-sm print:text-xs">{key}</span>
-                  <span class="ml-2">
-                    {#if value instanceof Date}
-                      {dateFormatter.format(value)}
-                    {:else if typeof value === 'boolean'}
-                      {value ? 'Ya' : 'Tidak'}
-                    {:else}
-                      {value}
-                    {/if}
-                  </span>
-                {/if}
+    </div>
+  {/snippet}
+  {#if selectedSheetName}
+    {#key selectedSheetName}
+      {#if selectedSheet && selectedSheet.length > 0}
+        <label class="flex max-w-80 flex-col print:hidden">
+          <span class="font-bold">Cari data:</span>
+          <input
+            type="text"
+            bind:value={searchQuery}
+            class="rounded-sm border border-green-500 bg-green-100 px-4 py-2 text-green-950"
+            onchange={() => {
+              currentPage = 0;
+            }}
+          />
+        </label>
+        {@const originalList = selectedSheet.map(formatObject)}
+        {@const filteredList =
+          searchQuery === ''
+            ? originalList
+            : originalList.filter((item) =>
+                Object.values(item).some(
+                  // at least one value contains the substring
+                  (item) =>
+                    typeof item === 'string' &&
+                    item.toLowerCase().includes(searchQuery.toLowerCase())
+                )
+              )}
+        {@const sortedList = trySortByDate(filteredList)}
+        {@const chunkedList = chunk(sortedList, pageSize)}
+        {@const pageEntries = chunkedList[currentPage]}
+        <fieldset class="print:hidden">
+          <legend>
+            Halaman <strong>{currentPage + 1}</strong> dari <strong>{chunkedList.length}</strong>
+          </legend>
+          {#if chunkedList.length > 1}
+            <button
+              disabled={currentPage === 0}
+              onclick={() => {
+                currentPage--;
+              }}
+              class="rounded-md border-b border-b-green-900 bg-green-700 px-3 py-1.5 text-xs text-green-50 not-disabled:cursor-pointer not-disabled:hover:bg-green-600 disabled:border-b-gray-600 disabled:bg-gray-300 disabled:text-gray-500"
+              >&lt; Halaman Sebelumnya</button
+            >
+            <button
+              disabled={currentPage === chunkedList.length - 1}
+              onclick={() => {
+                currentPage++;
+              }}
+              class="rounded-md border-b border-b-green-900 bg-green-700 px-3 py-1.5 text-xs text-green-50 not-disabled:cursor-pointer not-disabled:hover:bg-green-600 disabled:border-b-gray-600 disabled:bg-gray-300 disabled:text-gray-500"
+              >Halaman Selanjutnya &gt;</button
+            >
+          {/if}
+        </fieldset>
+        <div class="mt-6 grid grid-cols-1 gap-6 not-print:sm:grid-cols-2">
+          {#each pageEntries as entry, index}
+            <div
+              class:hidden={isPrinting ? index !== printIndex : false}
+              class="relative grid grid-cols-1 gap-y-2 rounded-sm p-4 not-print:bg-green-50 not-print:shadow-sm print:grid-cols-2 print:gap-x-6 print:gap-y-1"
+            >
+              <div class="absolute top-0 right-0 p-2 print:hidden">
+                <button
+                  onclick={() => triggerPrint(index)}
+                  class="text-md cursor-pointer rounded-md border-b-2 border-b-green-900 bg-green-700 px-3 py-1.5 text-green-50 hover:bg-green-600"
+                  >Print</button
+                >
               </div>
-            {/each}
-          </div>
-        {/each}
-      </div>
-    {:else}
-      <p>Pilihan sheet anda <strong>{selectedSheetName}</strong> tidak memiliki data</p>
-    {/if}
-  {/key}
-{:else}
-  <p>Pilih file dengan paling sedikit satu sheet di atas.</p>
-{/if}
+              {#each Object.entries(entry) as [key, value] (key)}
+                {@const lowerCaseKey = key.toLowerCase()}
+                <div
+                  class="flex break-inside-avoid flex-col divide-y divide-green-500 print:divide-black"
+                >
+                  {#if lowerCaseKey.includes('timestamp')}
+                    <span class="text-sm print:text-xs">Tanggal masuk data</span>
+                    <span class="ml-2">{dateFormatter.format(value)}</span>
+                  {:else if lowerCaseKey.includes('nama anak') || lowerCaseKey.includes('nama pasien')}
+                    <span class="text-sm font-semibold print:text-xs">{key}</span>
+                    <span class="ml-2 font-bold">{value}</span>
+                  {:else if typeof value === 'string' && value.includes('\n')}
+                    <span class="text-sm print:text-xs">{key}</span>
+                    <div class="ml-2">
+                      {#each value.split('\n') as line}
+                        {#if line.trim().length > 0}
+                          <p>{line}</p>
+                        {:else}
+                          <br />
+                        {/if}
+                      {/each}
+                    </div>
+                  {:else if typeof value === 'number' && key.includes('(')}
+                    {@const parenIndex = key.indexOf('(')}
+                    {@const unitlessKey = key.slice(0, parenIndex).trim()}
+                    {@const unit = key.slice(parenIndex + 1).replace(/\)$/, '')}
+                    <span class="text-sm print:text-xs">{unitlessKey}</span>
+                    <p class="ml-2">{value} {unit}</p>
+                  {:else}
+                    <span class="text-sm print:text-xs">{key}</span>
+                    <span class="ml-2">
+                      {#if value instanceof Date}
+                        {dateFormatter.format(value)}
+                      {:else if typeof value === 'boolean'}
+                        {value ? 'Ya' : 'Tidak'}
+                      {:else}
+                        {value}
+                      {/if}
+                    </span>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          {/each}
+        </div>
+      {:else}
+        <p>Pilihan sheet anda <strong>{selectedSheetName}</strong> tidak memiliki data</p>
+      {/if}
+    {/key}
+  {:else}
+    <p>Pilih file dengan paling sedikit satu sheet di atas.</p>
+  {/if}
+</svelte:boundary>
