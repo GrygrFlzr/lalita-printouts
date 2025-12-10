@@ -41,6 +41,9 @@ importers:
       tailwindcss:
         specifier: ^4.1.17
         version: 4.1.17
+      terser:
+        specifier: ^5.44.1
+        version: 5.44.1
       typescript:
         specifier: ~5.9.3
         version: 5.9.3
@@ -1585,7 +1588,6 @@ snapshots:
     dependencies:
       '@jridgewell/gen-mapping': 0.3.13
       '@jridgewell/trace-mapping': 0.3.31
-    optional: true
 
   '@jridgewell/sourcemap-codec@1.5.5': {}
 
@@ -1794,8 +1796,7 @@ snapshots:
 
   blake3-wasm@2.1.5: {}
 
-  buffer-from@1.1.2:
-    optional: true
+  buffer-from@1.1.2: {}
 
   chokidar@4.0.3:
     dependencies:
@@ -1819,8 +1820,7 @@ snapshots:
       color-convert: 2.0.1
       color-string: 1.9.1
 
-  commander@2.20.3:
-    optional: true
+  commander@2.20.3: {}
 
   cookie@1.1.1: {}
 
@@ -2114,10 +2114,8 @@ snapshots:
     dependencies:
       buffer-from: 1.1.2
       source-map: 0.6.1
-    optional: true
 
-  source-map@0.6.1:
-    optional: true
+  source-map@0.6.1: {}
 
   stoppable@1.1.0: {}
 
@@ -2163,7 +2161,6 @@ snapshots:
       acorn: 8.15.0
       commander: 2.20.3
       source-map-support: 0.5.21
-    optional: true
 
   tinyglobby@0.2.15:
     dependencies:
