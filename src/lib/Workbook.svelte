@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { onMount, tick, type Snippet } from 'svelte';
   import { utils, type WorkBook } from 'xlsx';
   interface Props {
     workbook: WorkBook;
+    failed: Snippet<[error: unknown, reset: () => void]>;
   }
-  const { workbook }: Props = $props();
+  const { workbook, failed }: Props = $props();
   const { SheetNames } = $derived(workbook);
 
   const excelEpochMs = Date.UTC(1900, 0, 1);
@@ -138,52 +139,7 @@
   </label>
 </div>
 
-<svelte:boundary>
-  {#snippet failed(error, reset)}
-    <h3 class="text-xl text-red-500">Ada masalah dengan proses file</h3>
-    <p>Harap kontak IT dengan screenshot eror bawah dan sertakan file yang bermasalah.</p>
-    <button
-      class="text-md cursor-pointer rounded-md border-b-2 border-b-green-900 bg-green-700 px-3 py-1.5 text-green-50 hover:bg-green-600"
-      onclick={reset}>Atau klik tombol ini untuk coba lagi</button
-    >
-    <p>Penjelasan untuk tim IT:</p>
-    <div class="flex flex-col border-l border-red-500 py-2 pl-4">
-      <fieldset class="border border-black px-2 pb-2 text-sm">
-        <legend class="text-slate-700">metadata</legend>
-        <p><strong>properties</strong>: {Object.getOwnPropertyNames(error).join(', ')}</p>
-        <p><strong>getPrototypeOf</strong>: {Object.getPrototypeOf(error)}</p>
-      </fieldset>
-      <fieldset class="text-md border border-green-900 px-2 pb-2">
-        <legend class="text-slate-700">actual error object</legend>
-        {#if error instanceof Error}
-          {#if 'name' in error}
-            <p><strong>name</strong>: {error.name}</p>
-          {/if}
-          {#if 'message' in error}
-            <p><strong>message</strong>: {error.message}</p>
-          {/if}
-          {#if 'cause' in error}
-            <p><strong>message</strong>: {error.cause}</p>
-          {/if}
-          <p><strong>stack</strong></p>
-          {#if 'stack' in error}
-            {#if typeof error.stack === 'string' && error.stack.includes('\n')}
-              <ol class="list-decimal pl-8">
-                {#each error.stack.split('\n').filter((line) => line.trim().length > 0) as line}
-                  <li class="font-mono">{line}</li>
-                {/each}
-              </ol>
-            {:else}
-              <pre class="pl-2 text-xs"><code>{error.stack}</code></pre>
-            {/if}
-          {/if}
-        {:else}
-          <pre><code>type: {typeof error}</code></pre>
-          <pre><code>{error}</code></pre>
-        {/if}
-      </fieldset>
-    </div>
-  {/snippet}
+<svelte:boundary {failed}>
   {#if selectedSheetName}
     {#key selectedSheetName}
       {#if selectedSheet && selectedSheet.length > 0}
