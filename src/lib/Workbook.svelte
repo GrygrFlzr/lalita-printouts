@@ -32,7 +32,7 @@
             maybeObject[key] = parseExcelDate(value);
           }
         } else if (typeof value === 'boolean') {
-          maybeObject[key] === value ? 'Ya' : 'Tidak';
+          maybeObject[key] = value ? 'Ya' : 'Tidak';
         }
       }
       if (importantField) {
@@ -238,8 +238,6 @@
                     <span class="ml-2">
                       {#if value instanceof Date}
                         {dateFormatter.format(value)}
-                      {:else if typeof value === 'boolean'}
-                        {value ? 'Ya' : 'Tidak'}
                       {:else}
                         {value}
                       {/if}
