@@ -218,7 +218,11 @@
         {@const pageEntries = chunkedList[currentPage]}
         <fieldset class="print:hidden">
           <legend>
-            Halaman <strong>{currentPage + 1}</strong> dari <strong>{chunkedList.length}</strong>
+            Halaman
+            <strong>{currentPage + 1}</strong>
+            dari
+            <strong>{chunkedList.length}</strong>
+            {searchQuery.length > 0 ? '(difilter)' : ''}
           </legend>
           {#if chunkedList.length > 1}
             <button
@@ -296,6 +300,8 @@
                 </div>
               {/each}
             </div>
+          {:else}
+            <p>Tidak ada hasil pencarian.</p>
           {/each}
         </div>
       {:else}

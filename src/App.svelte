@@ -3,7 +3,8 @@
   import { read, type WorkBook } from 'xlsx';
   import { onDestroy } from 'svelte';
 
-  const validMagicHeaders = [
+  type FileSignature = readonly number[];
+  const validMagicHeaders: FileSignature[] = [
     // xlsx is a zip file
     [0x50, 0x4b, 0x03, 0x04],
     // xls and xlsb are COM files
@@ -65,7 +66,7 @@
 
   let files: FileList | undefined = $state();
   let override = $state(false);
-  const file = $derived(files && 'length' in files && files.length === 1 ? files[0] : null);
+  const file = $derived(files?.item(0) ?? null);
   $effect(() => {
     if (file) {
       // reset override on file change
