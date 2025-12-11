@@ -8,15 +8,11 @@
   const { workbook, failed }: Props = $props();
   const { SheetNames } = $derived(workbook);
 
-  const excelEpochMs = Date.UTC(1900, 0, 1) - 2 * 24 * 60 * 60 * 1000;
   const dateFormatter = new Intl.DateTimeFormat('id-ID', {
     dateStyle: 'long',
     timeZone: 'Asia/Jakarta'
   });
-  const parseExcelDate = (daysSinceEpoch: number) =>
-    new Date(excelEpochMs + daysSinceEpoch * 24 * 60 * 60 * 1000);
   const maybeNIK = /\bNIK|KTP|KIA\b/;
-  const ignorableDateInMs = Date.UTC(2100, 0, 1);
   const formatObjectAsEntries = (maybeObject: any): [string, string | Date | number | bigint][] => {
     if (typeof maybeObject === 'object') {
       return Object.entries(maybeObject)
@@ -32,20 +28,8 @@
         })
         .map(([key, value]) => {
           switch (typeof value) {
-            case 'number': {
-              const lowercaseKey = key.toLowerCase();
-              if (lowercaseKey.includes('timestamp') || lowercaseKey.includes('tanggal')) {
-                const date = parseExcelDate(value);
-                if (date.getTime() < ignorableDateInMs) {
-                  return [key, date];
-                }
-                // fishy date, so don't convert it
-              }
-              // explicit fallthrough for other numbers
-            }
-            case 'bigint': {
-              // NIK cannot begin with 0, so we can guarantee length
-              // sometimes people typo and miss a number, so also accept 15
+            case 'number':
+            case 'bigint':
               if (maybeNIK.test(key)) {
                 const valueAsString = value.toString();
                 const valueLength = valueAsString.length;
@@ -55,13 +39,13 @@
               }
               // fallback to just returning the bigint/number
               return [key, value];
-            }
             case 'boolean':
               // autocast to indonesian
               return [key, value ? 'Ya' : 'Tidak'];
             case 'string': {
               const lowercaseKey = key.toLowerCase();
               if (lowercaseKey.includes('timestamp') || lowercaseKey.includes('tanggal')) {
+                // UTC Dates that SheetJS doesn't convert
                 const maybeDate = new Date(value);
                 const isValidDate = !isNaN(maybeDate.getTime());
                 if (isValidDate) {
@@ -70,9 +54,13 @@
               }
               return [key, value];
             }
-            // really strange cases that should never happen, ideally
             case 'object':
+              if (value instanceof Date && !isNaN(value.getTime())) {
+                // rely on SheetJS's Date parsing
+                return [key, value];
+              }
               return [key, JSON.stringify(value, null, 2)];
+            // really strange cases that should never happen, ideally
             case 'function':
             case 'symbol':
               return [key, value.toString()];
@@ -129,6 +117,10 @@
 
   let isPrinting = $state(false);
   let printIndex = $state(0);
+  const resetPrint = () => {
+    isPrinting = false;
+    printIndex = 0;
+  };
   const triggerPrint = (itemIndex: number) => {
     isPrinting = true;
     printIndex = itemIndex;
@@ -149,10 +141,6 @@
       : utils.sheet_to_json(workbook.Sheets[selectedSheetName])
   );
   onMount(() => {
-    const resetPrint = () => {
-      isPrinting = false;
-      printIndex = 0;
-    };
     window.addEventListener('afterprint', resetPrint);
     return () => {
       window.removeEventListener('afterprint', resetPrint);

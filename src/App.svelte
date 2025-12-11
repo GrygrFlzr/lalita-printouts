@@ -2,6 +2,21 @@
   import Workbook from './lib/Workbook.svelte';
   import { read } from 'xlsx';
 
+  const validMagicHeaders = [
+    // xlsx is a zip file
+    [0x50, 0x4b, 0x03, 0x04],
+    // xls and xlsb are COM files
+    [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]
+  ];
+  const isExcelFile = (signature: Uint8Array) =>
+    validMagicHeaders.some((header) => {
+      for (let i = 0; i < header.length; i++) {
+        if (header[i] !== signature[i]) {
+          return false;
+        }
+      }
+      return true;
+    });
   const acceptedFileTypes = [
     {
       file_type: 'Excel 97-2003 Workbook',
@@ -48,7 +63,15 @@
     .flatMap(({ extension, mime_type }) => [extension, mime_type])
     .join(',');
 
-  let files: FileList | undefined | null = $state(null);
+  let files: FileList | undefined = $state();
+  let override = $state(false);
+  const file = $derived(files && 'length' in files && files.length === 1 ? files[0] : null);
+  $effect(() => {
+    if (file) {
+      // reset override on file change
+      override = false;
+    }
+  });
 </script>
 
 {#snippet errorDebug(error: unknown)}
@@ -62,7 +85,7 @@
         <p><strong>message</strong>: {error.message}</p>
       {/if}
       {#if 'cause' in error}
-        <p><strong>message</strong>: {error.cause}</p>
+        <p><strong>cause</strong>: {error.cause}</p>
       {/if}
       <p><strong>stack</strong></p>
       {#if 'stack' in error}
@@ -113,19 +136,30 @@
   </label>
 
   <svelte:boundary {failed}>
-    {#if files}
-      {#if files.length === 1}
-        {#await files.item(0)!.arrayBuffer()}
-          <p>Membaca file...</p>
-        {:then binaryData}
-          <Workbook workbook={read(binaryData)} {failed} />
-        {:catch error}
+    {#if file}
+      {#await file.arrayBuffer()}
+        <p>Membaca file...</p>
+      {:then binaryData}
+        {@const signature = new Uint8Array(binaryData.slice(0, 8))}
+        {#if isExcelFile(signature) || override}
+          <Workbook workbook={read(binaryData, { cellDates: true })} {failed} />
+        {:else}
           <h3 class="text-red-500">Gagal membaca file</h3>
-          {@render errorDebug(error)}
-        {/await}
-      {:else}
-        <p>Tolong pilih hanya satu file!</p>
-      {/if}
+          <p>
+            Apakah anda yakin <span class="font-mono">{file.name}</span> merupakan file Microsoft Excel?
+          </p>
+          <button
+            class="text-md cursor-pointer rounded-md border-b-2 border-b-green-900 bg-green-700 px-3 py-1.5 text-green-50 hover:bg-green-600"
+            onclick={() => {
+              override = true;
+            }}>Saya yakin, coba buka</button
+          >
+          <pre><code>Headers: {signature.toString()}</code></pre>
+        {/if}
+      {:catch error}
+        <h3 class="text-red-500">Gagal membaca file</h3>
+        {@render errorDebug(error)}
+      {/await}
     {/if}
   </svelte:boundary>
 </main>
