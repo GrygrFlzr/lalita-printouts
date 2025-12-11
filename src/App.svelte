@@ -1,13 +1,14 @@
 <script lang="ts">
   import Workbook from './lib/Workbook.svelte';
   import { read } from 'xlsx';
+  import { onDestroy } from 'svelte';
 
   const validMagicHeaders = [
     // xlsx is a zip file
     [0x50, 0x4b, 0x03, 0x04],
     // xls and xlsb are COM files
     [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]
-  ];
+  ] as const;
   const isExcelFile = (signature: Uint8Array) =>
     validMagicHeaders.some((header) => {
       for (let i = 0; i < header.length; i++) {
@@ -58,7 +59,7 @@
       extension: '.xlc',
       mime_type: 'application/vnd.ms-excel'
     }
-  ];
+  ] as const;
   const acceptedString = acceptedFileTypes
     .flatMap(({ extension, mime_type }) => [extension, mime_type])
     .join(',');
@@ -70,6 +71,12 @@
     if (file) {
       // reset override on file change
       override = false;
+    }
+  });
+  onDestroy(() => {
+    // hint GC to cleanup
+    if (files) {
+      files = undefined;
     }
   });
 </script>

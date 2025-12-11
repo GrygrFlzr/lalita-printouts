@@ -7,10 +7,15 @@
   }
   const { workbook, failed }: Props = $props();
   const { SheetNames } = $derived(workbook);
+  const CONFIG = {
+    DEFAULT_PAGE_SIZE: 100,
+    DATE_LOCALE: 'id-ID',
+    TIMEZONE: 'Asia/Jakarta'
+  } as const;
 
-  const dateFormatter = new Intl.DateTimeFormat('id-ID', {
+  const dateFormatter = new Intl.DateTimeFormat(CONFIG.DATE_LOCALE, {
     dateStyle: 'long',
-    timeZone: 'Asia/Jakarta'
+    timeZone: CONFIG.TIMEZONE
   });
   const maybeNIK = /\bNIK|KTP|KIA\b/;
   const formatObjectAsEntries = (maybeObject: any): [string, string | Date | number | bigint][] => {
@@ -133,8 +138,9 @@
   // svelte-ignore state_referenced_locally
   let selectedSheetName: undefined | string = $state();
   let searchQuery: string = $state('');
+  const lowercaseSearchQuery = $derived(searchQuery.toLowerCase());
   let currentPage = $state(0);
-  let pageSize = $state(100);
+  let pageSize = $state(CONFIG.DEFAULT_PAGE_SIZE);
   const selectedSheet = $derived(
     typeof selectedSheetName === 'undefined'
       ? null
@@ -191,8 +197,7 @@
             : originalList.filter((item) =>
                 item.some(
                   ([_key, value]) =>
-                    typeof value === 'string' &&
-                    value.toLowerCase().includes(searchQuery.toLowerCase())
+                    typeof value === 'string' && value.toLowerCase().includes(lowercaseSearchQuery)
                 )
               )}
         {@const sortedList = trySortByDate(filteredList)}
