@@ -164,10 +164,15 @@
           {/if}
           <!-- bug in prettier-plugin-svelte removes generics -->
           <!-- prettier-ignore -->
-          {#await new Promise<WorkBook>((resolve) => {
+          {#await new Promise<WorkBook>((resolve, reject) => {
             setTimeout(() => {
               // delay actual read to not block main thread
-              resolve(read(binaryData, { cellDates: true }));
+              try {
+                const result = read(binaryData, { cellDates: true });
+                resolve(result);
+              } catch (e) {
+                reject(e);
+              }
             }, 0);
           })}
             <p>Memproses {file.name}... (jangan tutup tab)</p>
