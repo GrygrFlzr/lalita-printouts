@@ -1,6 +1,6 @@
 <script lang="ts">
-  import Workbook from './lib/Workbook.svelte';
-  import { read } from 'xlsx';
+  import WorkbookComponent from './lib/Workbook.svelte';
+  import { read, type WorkBook } from 'xlsx';
   import { onDestroy } from 'svelte';
 
   const validMagicHeaders = [
@@ -10,14 +10,13 @@
     [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]
   ] as const;
   const isExcelFile = (signature: Uint8Array) =>
-    validMagicHeaders.some((header) => {
-      for (let i = 0; i < header.length; i++) {
-        if (header[i] !== signature[i]) {
-          return false;
-        }
-      }
-      return true;
-    });
+    validMagicHeaders.some(
+      (header) =>
+        // make sure the file is at least as long as our magic header
+        signature.length >= header.length &&
+        // compare every byte matches
+        header.every((byte, i) => byte === signature[i])
+    );
   const acceptedFileTypes = [
     {
       file_type: 'Excel 97-2003 Workbook',
@@ -144,12 +143,39 @@
 
   <svelte:boundary {failed}>
     {#if file}
+      {#if file.size === 0}
+        <p class="text-red-500">File kosong. Tolong pilih file yang valid.</p>
+      {:else if file.size > 8_000_000}
+        <p class="text-yellow-700">
+          Peringatan: File sangat besar ({(file.size / 1_000_000).toFixed(1)} MB). Pemrosesan mungkin
+          lambat.
+        </p>
+      {/if}
       {#await file.arrayBuffer()}
         <p>Membaca file...</p>
       {:then binaryData}
         {@const signature = new Uint8Array(binaryData.slice(0, 8))}
         {#if isExcelFile(signature) || override}
-          <Workbook workbook={read(binaryData, { cellDates: true })} {failed} />
+          {#if override}
+            <p class="text-yellow-700">
+              Peringatan: Membuka file dengan paksa. Hasil mungkin tidak akurat.
+            </p>
+          {/if}
+          <!-- bug in prettier-plugin-svelte removes generics -->
+          <!-- prettier-ignore -->
+          {#await new Promise<WorkBook>((resolve) => {
+            setTimeout(() => {
+              // delay actual read to not block main thread
+              resolve(read(binaryData, { cellDates: true }));
+            }, 0);
+          })}
+            <p>Memproses {file.name}... (jangan tutup tab)</p>
+          {:then workbook}
+            <WorkbookComponent {workbook} {failed} />
+          {:catch error}
+            <h3 class="text-red-500">Gagal memroses file</h3>
+            {@render errorDebug(error)}
+          {/await}
         {:else}
           <h3 class="text-red-500">Gagal membaca file</h3>
           <p>

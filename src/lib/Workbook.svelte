@@ -10,13 +10,17 @@
   const CONFIG = {
     DEFAULT_PAGE_SIZE: 100,
     DATE_LOCALE: 'id-ID',
-    TIMEZONE: 'Asia/Jakarta'
+    TIMEZONE: 'Asia/Jakarta',
+    NIK_LENGTH: 16,
+    // in case someone accidentally missed a number
+    TYPO_NIK_LENGTH: 15
   } as const;
 
   const dateFormatter = new Intl.DateTimeFormat(CONFIG.DATE_LOCALE, {
     dateStyle: 'long',
     timeZone: CONFIG.TIMEZONE
   });
+  const dateKeyPattern = /^(timestamp|tanggal|tgl|date|waktu)/i;
   const maybeNIK = /\bNIK|KTP|KIA\b/;
   const formatObjectAsEntries = (maybeObject: any): [string, string | Date | number | bigint][] => {
     if (typeof maybeObject === 'object') {
@@ -38,7 +42,7 @@
               if (maybeNIK.test(key)) {
                 const valueAsString = value.toString();
                 const valueLength = valueAsString.length;
-                if (valueLength === 15 || valueLength === 16) {
+                if (valueLength === CONFIG.NIK_LENGTH || valueLength === CONFIG.TYPO_NIK_LENGTH) {
                   return [key, valueAsString];
                 }
               }
@@ -48,9 +52,8 @@
               // autocast to indonesian
               return [key, value ? 'Ya' : 'Tidak'];
             case 'string': {
-              const lowercaseKey = key.toLowerCase();
-              if (lowercaseKey.includes('timestamp') || lowercaseKey.includes('tanggal')) {
-                // UTC Dates that SheetJS doesn't convert
+              if (dateKeyPattern.test(key)) {
+                // UTC Dates that SheetJS doesn't convert?
                 const maybeDate = new Date(value);
                 const isValidDate = !isNaN(maybeDate.getTime());
                 if (isValidDate) {
@@ -112,6 +115,9 @@
   };
 
   const chunk = <T,>(list: T[], chunkSize: number) => {
+    if (chunkSize <= 0) {
+      throw new Error('chunkSize must be positive');
+    }
     const pageCount = Math.ceil(list.length / chunkSize);
     return [...Array(pageCount)].map((_, index) => {
       const start = index * chunkSize;
@@ -136,7 +142,9 @@
   };
 
   // svelte-ignore state_referenced_locally
-  let selectedSheetName: undefined | string = $state();
+  let selectedSheetName: undefined | string = $state(
+    SheetNames.length > 0 ? SheetNames[0] : undefined
+  );
   let searchQuery: string = $state('');
   const lowercaseSearchQuery = $derived(searchQuery.toLowerCase());
   let currentPage = $state(0);
@@ -168,7 +176,7 @@
         currentPage = 0;
       }}
     >
-      {#each workbook.SheetNames as sheetName, index (sheetName)}
+      {#each workbook.SheetNames as sheetName (sheetName)}
         <option value={sheetName}>{sheetName}</option>
       {/each}
     </select>
@@ -195,10 +203,15 @@
           searchQuery === ''
             ? originalList
             : originalList.filter((item) =>
-                item.some(
-                  ([_key, value]) =>
-                    typeof value === 'string' && value.toLowerCase().includes(lowercaseSearchQuery)
-                )
+                item.some(([_key, value]) => {
+                  const searchableValue =
+                    value instanceof Date
+                      ? dateFormatter.format(value)
+                      : typeof value === 'string'
+                        ? value
+                        : String(value);
+                  return searchableValue.toLowerCase().includes(lowercaseSearchQuery);
+                })
               )}
         {@const sortedList = trySortByDate(filteredList)}
         {@const chunkedList = chunk(sortedList, pageSize)}
@@ -209,6 +222,7 @@
           </legend>
           {#if chunkedList.length > 1}
             <button
+              aria-label="Halaman sebelumnya"
               disabled={currentPage === 0}
               onclick={() => {
                 currentPage--;
@@ -217,6 +231,7 @@
               >&lt; Halaman Sebelumnya</button
             >
             <button
+              aria-label="Halaman selanjutnya"
               disabled={currentPage === chunkedList.length - 1}
               onclick={() => {
                 currentPage++;
@@ -234,6 +249,7 @@
             >
               <div class="absolute top-0 right-0 p-2 print:hidden">
                 <button
+                  aria-label="Print entri ini"
                   onclick={() => triggerPrint(index)}
                   class="text-md cursor-pointer rounded-md border-b-2 border-b-green-900 bg-green-700 px-3 py-1.5 text-green-50 hover:bg-green-600"
                   >Print</button
