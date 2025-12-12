@@ -64,7 +64,7 @@
     .flatMap(({ extension, mime_type }) => [extension, mime_type])
     .join(',');
 
-  let files: FileList | undefined = $state();
+  let files: FileList | undefined = $state.raw();
   let override = $state(false);
   const file = $derived(files?.item(0) ?? null);
   $effect(() => {
